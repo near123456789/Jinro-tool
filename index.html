@@ -9,7 +9,8 @@
 <body>
   <header class="header">
     <h1>人狼解析ツール</h1>
-    <!-- スマホOK：学習の保存/読み込み（テキスト＆ファイル） -->
+
+    <!-- 学習の保存/読み込み（スマホ対応） -->
     <div class="model-share">
       <button id="exportModelText" class="jj-btn">学習をコピー（テキスト）</button>
       <button id="importModelText" class="jj-btn jj-btn--ghost">貼り付けから読み込み</button>
@@ -35,7 +36,7 @@
   </div>
 
   <main class="grid">
-    <!-- 左：候補キャラ -->
+    <!-- 左：キャラ候補（ボタン並び） -->
     <section class="panel">
       <h2>キャラ候補</h2>
       <div class="row">
@@ -43,9 +44,11 @@
         <button id="addName" class="jj-btn">追加</button>
         <button id="reloadCandidates" class="jj-btn jj-btn--ghost">更新</button>
       </div>
-      <select id="namePool" size="12" class="list"></select>
+
+      <!-- ここに候補ボタンを並べる -->
+      <div id="candWrap" class="cand-wrap"></div>
+
       <div class="row">
-        <button id="addSelected" class="jj-btn">→ 右に追加</button>
         <button id="clearAll" class="jj-btn jj-btn--ghost">クリア</button>
       </div>
     </section>

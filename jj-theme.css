@@ -2,42 +2,62 @@
   --bg:#1e1417; --panel:#2b1f24; --accent:#b58d7c; --text:#f2e8e4;
   --muted:#cbb; --btn:#e6d2c7; --pill:#9ad09a;
 }
+
+/* base */
 *{box-sizing:border-box}
-html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,Helvetica,Arial,sans-serif}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,Helvetica,Arial,sans-serif}
 h1,h2,h3{margin:.3rem 0 .6rem}
+
+/* header */
 .header{padding:12px 16px;border-bottom:1px solid #3a2a2f}
 .header h1{margin:0 0 8px}
 .model-share{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 12px}
 .file-label{cursor:pointer}
 
+/* layout */
 .grid{display:grid;gap:16px;padding:16px;grid-template-columns:1fr 1fr}
 .grid-2{display:grid;gap:12px;grid-template-columns:1fr 1fr}
 .panel{background:var(--panel);border-radius:10px;padding:12px;border:1px solid #3a2a2f}
 .panel--wide{grid-column:1/-1}
 
+/* form parts */
 .row{display:flex;gap:8px;align-items:center;margin:6px 0}
-.input,select{background:#23181b;color:var(--text);border:1px solid #4a3740;border-radius:8px;padding:8px}
-.list{width:100%;height:260px}
+.input,select{background:#23181b;color:var(--text);border:1px solid #4a3740;border-radius:8px;padding:8px;min-height:34px}
+.list{width:100%;height:120px;overflow-y:auto}
+
+/* candidate buttons */
+.cand-wrap{display:flex;flex-wrap:wrap;gap:8px;max-height:160px;overflow:auto;padding:6px;border:1px solid #3a2a2f;border-radius:8px;background:#23181b}
+.chip{background:#3a2a2f;color:#e9dad5;border:1px solid #6b5258;border-radius:999px;padding:6px 10px;cursor:pointer}
+.chip:hover{filter:brightness(1.05)}
+
+/* roster */
 .roster .row{display:grid;grid-template-columns:1fr 130px 140px auto;gap:8px;align-items:center;margin:6px 0}
 .roster .name{padding:6px 8px;background:#23181b;border-radius:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .roster .dead .name{opacity:.5;text-decoration:line-through}
 .slim{padding:6px}
 
+/* buttons */
 .jj-btn{background:linear-gradient(#e6d2c7,#ccb3a3);border:1px solid #a68474;border-radius:10px;padding:8px 12px;color:#35231f;cursor:pointer}
 .jj-btn:hover{filter:brightness(1.05)}
 .jj-btn--ghost{background:#24191c;border:1px solid #6b5258;color:#e9dad5}
-
-.tabs{display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap}
-.tab{background:#24191c;border:1px solid #6b5258;color:#e9dad5;border-radius:10px;padding:6px 10px;cursor:pointer}
-.tab.active{background:linear-gradient(#e6d2c7,#ccb3a3);color:#35231f;border-color:#a68474}
-
-.kvs{display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:6px;margin:6px 0}
 .btn-icon{background:#24191c;border:1px solid #6b5258;color:#e9dad5;border-radius:8px;padding:6px 8px;cursor:pointer}
 
+/* tabs */
+.tabs{display:flex;gap:6px;margin-bottom:8px;flex-wrap:nowrap;overflow-x:auto}
+.tabs::-webkit-scrollbar{height:6px}
+.tab{flex:0 0 auto;background:#24191c;border:1px solid #6b5258;color:#e9dad5;border-radius:10px;padding:6px 10px;cursor:pointer}
+.tab.active{background:linear-gradient(#e6d2c7,#ccb3a3);color:#35231f;border-color:#a68474}
+
+/* kvs (占い/霊能 行) */
+.kvs{display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:6px;margin:6px 0}
+
+/* table */
 .table-wrap{overflow:auto;border:1px solid #3a2a2f;border-radius:8px}
 .table{width:100%;border-collapse:collapse}
 .table th,.table td{border-bottom:1px solid #3a2a2f;padding:8px;text-align:left;white-space:nowrap}
 
+/* chart & ranking */
 .chart{background:#23181b;border:1px solid #3a2a2f;border-radius:8px;padding:8px;min-height:220px;margin-bottom:10px}
 .ranking div{display:flex;justify-content:space-between;border:1px solid #3a2a2f;border-radius:8px;padding:8px;margin:6px 0;background:#23181b}
 .ranking .pill{background:var(--pill);color:#0c240c;border-radius:999px;padding:2px 8px}
@@ -45,19 +65,25 @@ h1,h2,h3{margin:.3rem 0 .6rem}
 
 .err{margin-top:8px;background:#4c2020;border:1px solid #7b2f2f;color:#ffdede;padding:8px;border-radius:8px}
 
+/* modal */
 .modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999}
 .modal__panel{margin:10vh auto;max-width:680px;background:#2b1f24;color:#fff;padding:16px;border-radius:8px;border:1px solid #3a2a2f}
 .modal__title{margin:0 0 8px}
 .modal__textarea{width:100%;min-height:140px;background:#21171a;color:#fff;border:1px solid #4a3740;border-radius:8px;padding:8px}
 .modal__actions{margin-top:8px;display:flex;gap:8px;justify-content:flex-end}
 
-/* スマホ最適化 */
-@media (max-width: 800px){
+/* ===== “PC構成ほぼ維持” のレスポンシブ ===== */
+/* 540px以下で初めて1カラムに。それ以上はPCと同じ2カラムを維持 */
+@media (max-width: 540px){
   .grid{grid-template-columns:1fr}
   .grid-2{grid-template-columns:1fr}
-  .roster .row{grid-template-columns:1fr 120px 120px auto}
-  .model-share .jj-btn{padding:10px 12px;font-size:15px}
-  .tab{padding:8px 10px;font-size:14px}
-  .kvs{grid-template-columns:1fr 1fr 1fr auto}
+  .row{flex-direction:column;align-items:stretch}
+  .input, select, .jj-btn{width:100%;font-size:15px}
+  .cand-wrap{max-height:180px}
+  /* rosterは4カラムのままでも使えるが、狭い端末では縦積みに切替 */
+  .roster .row{grid-template-columns:1fr}
+  .slim{width:100%}
+  .jj-btn.jj-btn--ghost{width:100%}
+  .kvs{grid-template-columns:1fr 1fr;gap:8px}
   #chart svg{width:100%;height:auto}
 }

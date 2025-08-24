@@ -1,10 +1,5 @@
-// app.js — 人狼解析ツール v3 (スマホ共有UI/自己学習付き)
-// ・9スタ前提：占い/霊能は必ずCO、1COは真確
-// ・2dは基本「灰吊り」。ただし 2-2（占2CO・霊2CO）なら「霊能ロラ/霊能決め打ち」も候補に追加
-// ・狩2CO時のみ 護衛方針（クロス/貫通）が意味を持つ
-// ・3d以降は「占い/霊能/灰 決め打ち」を候補化（1CO真確は候補から除外）
-// ・候補ごとに政策（吊り方針×護衛方針）でMonteCarlo → Beta学習(localStorage)とブレンド表示
-console.log('[JinroTool] v3 MC+Learning+MobileShare');
+// app.js — 人狼解析ツール v3 (候補ボタン/自己学習/スマホ共有)
+console.log('[JinroTool] v3.1 buttons+MC+Learning');
 
 let ALL_NAMES = [
   'アンナ','マイク','エリック','バニラ','メアリー','ジェイ','ショーン','ローラ','ビル','ミカ',
@@ -18,8 +13,9 @@ const TRUE_ROLE_OPTIONS = ['未設定','村人','人狼','狂人','占い師','�
 const COLOR_OPTIONS = ['白','黒'];
 
 const els = {
-  namePool: q('#namePool'), addSelected:q('#addSelected'), clearAll:q('#clearAll'),
-  newName:q('#newName'), addName:q('#addName'), reloadCandidates:q('#reloadCandidates'),
+  candWrap:q('#candWrap'),
+  addName:q('#addName'), newName:q('#newName'), reloadCandidates:q('#reloadCandidates'),
+  clearAll:q('#clearAll'),
   selectedRoster:q('#selectedRoster'),
   dayTabs:q('#dayTabs'), lynchSel:q('#lynchSel'), killSel:q('#killSel'),
   applyDay:q('#applyDay'), undoDay:q('#undoDay'),
@@ -27,11 +23,16 @@ const els = {
   chart:q('#chart'), rankingWrap:q('#rankingWrap'),
   seerRows:q('#seerRows'), addSeerRow:q('#addSeerRow'),
   medRows:q('#medRows'), addMedRow:q('#addMedRow'),
-  err:q('#err')
+  err:q('#err'),
+  // 共有UI
+  exportModelText:q('#exportModelText'), importModelText:q('#importModelText'),
+  exportModelFile:q('#exportModelFile'), resetModelBtn:q('#resetModel'),
+  importFile:q('#importFile'), pasteModal:q('#pasteModal'),
+  pasteArea:q('#pasteArea'), pasteApply:q('#pasteApply'), pasteCancel:q('#pasteCancel'),
 };
 function q(s){ return document.querySelector(s); }
 
-// ======= 学習ストア（Beta分布） =======
+// ======= 学習ストア =======
 const MODEL_KEY = 'jinro_model_v1';
 function loadModel(){ try{ return JSON.parse(localStorage.getItem(MODEL_KEY)||'{}'); }catch{ return {}; } }
 function saveModel(m){ localStorage.setItem(MODEL_KEY, JSON.stringify(m)); }
@@ -42,48 +43,22 @@ let MODEL = loadModel();
 // ======= 状態 =======
 const selected = new Map();
 const days = [];
-let currentDay = 2; // 2dから開始
-const seerResultsByDay = new Map();   // day -> [{seer,target,color}]
-const mediumResultsByDay = new Map(); // day -> [{medium,target,color}]
+let currentDay = 2;
+const seerResultsByDay = new Map();
+const mediumResultsByDay = new Map();
 const daySummaries = new Map();
 let tempSeerRows = [];
 let tempMedRows  = [];
 
-// ======= 共有UI =======
-const btnExportText = q('#exportModelText');
-const btnImportText = q('#importModelText');
-const btnExportFile = q('#exportModelFile');
-const btnReset      = q('#resetModel');
-const inpImportFile = q('#importFile');
-const pasteModal    = q('#pasteModal');
-const pasteArea     = q('#pasteArea');
-const pasteApply    = q('#pasteApply');
-const pasteCancel   = q('#pasteCancel');
-
 // ======= 初期化 =======
 document.addEventListener('DOMContentLoaded', init);
 function init(){
-  populatePool(); renderSelected();
+  renderCandidateButtons(); renderSelected();
   buildDayTabs([2,3,4,5,6]); setActiveDay(2);
-
-  if (els.namePool) {
-    els.namePool.addEventListener('dblclick',(e)=>{
-      const opt=e.target?.closest('option'); if(!opt) return;
-      [...els.namePool.options].forEach(o=>o.selected=(o===opt));
-      addSelectedToRoster();
-    });
-    els.namePool.addEventListener('click',(e)=>{
-      const opt=e.target?.closest('option'); if(!opt) return;
-      if(!e.metaKey && !e.ctrlKey && !e.shiftKey){
-        [...els.namePool.options].forEach(o=>o.selected=(o===opt));
-      }
-    });
-  }
 
   els.addName.addEventListener('click', onAddName);
   els.newName.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); onAddName(); }});
-  els.addSelected.addEventListener('click', addSelectedToRoster);
-  els.reloadCandidates?.addEventListener('click', populatePool);
+  els.reloadCandidates?.addEventListener('click', renderCandidateButtons);
   els.clearAll.addEventListener('click', clearAll);
 
   els.addSeerRow.addEventListener('click', ()=>{
@@ -99,38 +74,42 @@ function init(){
   els.applyDay.addEventListener('click', applyDay);
   els.undoDay.addEventListener('click', undoDay);
 
-  // 共有UIイベント
-  if (btnExportText) btnExportText.addEventListener('click', exportModelText);
-  if (btnImportText) btnImportText.addEventListener('click', openPasteModal);
-  if (btnExportFile) btnExportFile.addEventListener('click', exportModelFile);
-  if (btnReset)      btnReset.addEventListener('click', resetModel);
-  if (inpImportFile) inpImportFile.addEventListener('change', importModelFromFile);
-  if (pasteApply)    pasteApply.addEventListener('click', applyPasteImport);
-  if (pasteCancel)   pasteCancel.addEventListener('click', closePasteModal);
+  // 共有UI
+  els.exportModelText?.addEventListener('click', exportModelText);
+  els.importModelText?.addEventListener('click', openPasteModal);
+  els.exportModelFile?.addEventListener('click', exportModelFile);
+  els.resetModelBtn?.addEventListener('click', resetModel);
+  els.importFile?.addEventListener('change', importModelFromFile);
+  els.pasteApply?.addEventListener('click', applyPasteImport);
+  els.pasteCancel?.addEventListener('click', closePasteModal);
 }
 
-// ======= 候補リスト =======
-function populatePool(){
-  if(!els.namePool) return;
-  els.namePool.innerHTML='';
+// ======= 候補（ボタン） =======
+function renderCandidateButtons(){
+  els.candWrap.innerHTML='';
   const uniq = Array.from(new Set(ALL_NAMES.map(s => (s||'').trim()).filter(Boolean)));
   ALL_NAMES = uniq;
+
   uniq.forEach(n=>{
-    const o=document.createElement('option'); o.value=n; o.textContent=n;
-    els.namePool.appendChild(o);
+    const b=document.createElement('button');
+    b.className='chip';
+    b.textContent=n;
+    b.title=`${n} を右に追加`;
+    b.addEventListener('click',()=> addToRoster([n]));
+    els.candWrap.appendChild(b);
   });
 }
 function onAddName(){
   const raw=(els.newName.value||'').trim(); if(!raw) return;
   const name=raw.replace(/\s+/g,' ');
-  if(!ALL_NAMES.includes(name)){ ALL_NAMES.push(name); populatePool(); }
-  [...els.namePool.options].forEach(opt=> opt.selected = (opt.value===name));
-  addSelectedToRoster(); els.newName.value='';
+  if(!ALL_NAMES.includes(name)){ ALL_NAMES.push(name); renderCandidateButtons(); }
+  addToRoster([name]);
+  els.newName.value='';
 }
-function addSelectedToRoster(){
-  const picks=[...els.namePool.selectedOptions].map(o=>(o.value||'').trim()).filter(Boolean);
-  if(picks.length===0) return;
-  picks.forEach(n=>{
+
+// ======= 右ロスター =======
+function addToRoster(names){
+  names.forEach(n=>{
     if(!selected.has(n)){ selected.set(n,{co:'—',trueRole:'未設定',alive:true}); }
   });
   renderSelected(); rebuildSeerRowsUI(); rebuildMediumRowsUI(); refreshEventSelectors();
@@ -139,10 +118,8 @@ function clearAll(){
   selected.clear(); days.length=0; daySummaries.clear();
   seerResultsByDay.clear(); mediumResultsByDay.clear();
   tempSeerRows=[]; tempMedRows=[];
-  renderSelected(); renderHistory(); renderChart(); renderRanking(null);
+  renderCandidateButtons(); renderSelected(); renderHistory(); renderChart(); renderRanking(null);
 }
-
-// ======= 右ロスター =======
 function renderSelected(){
   els.selectedRoster.innerHTML='';
   [...selected.keys()].forEach(name=>{
@@ -342,11 +319,11 @@ function snapshotStateForDay(day){
   return {day,sc,mc,hc,semi,medBlack,medWhite,seerConfirmed,medConfirmed,aliveCount,grayCount};
 }
 
-// ======= 候補列挙（2d特例 / 3d以降） =======
+// ======= 候補列挙 =======
 function enumerateCandidatesByDay(s){
   const acts = [];
   if (s.day === 2) {
-    acts.push('灰吊り'); // 初日（2d）は基本これのみ
+    acts.push('灰吊り');
     if (s.sc === 2 && s.mc === 2) {
       acts.push('霊能ロラ');
       acts.push('霊能決め打ち');
@@ -390,7 +367,7 @@ function simulatePolicy(state, cand, n=400){
   return wins/n;
 }
 
-// ======= 1試行（政策付き） =======
+// ======= 1試行 =======
 function runOneGameWithPolicy(state, cand){
   const roles = assignRoles9(state);
   if(!checkConsistencyUpToCurrentDay(roles)) return Math.random() < 0.5;
@@ -402,22 +379,18 @@ function runOneGameWithPolicy(state, cand){
   let hunterClaims = getAliveNamesByCO('狩人CO');
 
   while(true){
-    // --- 昼（吊り） ---
     const lynch = pickLynch(alive, roles, day, cand, state, has2ClaimedHunter, hunterClaims);
     if(!lynch) return Math.random()<0.5;
     alive = alive.filter(p=>p!==lynch);
 
-    // 勝敗チェック
     let wolves = alive.filter(p=>roles[p]==='人狼');
     let vill   = alive.filter(p=>roles[p]!=='人狼');
     if(wolves.length===0) return true;
     if(wolves.length>=vill.length) return false;
 
-    // --- 夜（噛み） ---
     const kill = pickKill(alive, roles, cand, state);
     if(kill){ alive = alive.filter(p=>p!==kill); }
 
-    // 勝敗再チェック
     wolves = alive.filter(p=>roles[p]==='人狼');
     vill   = alive.filter(p=>roles[p]!=='人狼');
     if(wolves.length===0) return true;
@@ -428,9 +401,7 @@ function runOneGameWithPolicy(state, cand){
 }
 
 // ======= 役職割当（9スタ） =======
-function buildRolePool9(){
-  return ['村人','村人','村人','人狼','人狼','狂人','占い師','霊能者','狩人'];
-}
+function buildRolePool9(){ return ['村人','村人','村人','人狼','人狼','狂人','占い師','霊能者','狩人']; }
 function assignRoles9(state){
   const allPlayers = [...selected.keys()];
   if(allPlayers.length !== 9) throw new Error(`9スタ前提：選択が${allPlayers.length}人。9人にして下さい。`);
@@ -440,18 +411,13 @@ function assignRoles9(state){
     if(tr && tr!=='未設定'){ roles[p]=tr; }
   });
   const pool = buildRolePool9();
-  Object.values(roles).forEach(r=>{
-    const i=pool.indexOf(r); if(i>=0) pool.splice(i,1);
-  });
+  Object.values(roles).forEach(r=>{ const i=pool.indexOf(r); if(i>=0) pool.splice(i,1); });
   const remaining = allPlayers.filter(p=>!roles[p]);
-  remaining.forEach(p=>{
-    const idx = Math.floor(Math.random()*pool.length);
-    roles[p] = pool.splice(idx,1)[0];
-  });
+  remaining.forEach(p=>{ const idx = Math.floor(Math.random()*pool.length); roles[p] = pool.splice(idx,1)[0]; });
   return roles;
 }
 
-// ======= 整合性チェック（currentDayまで） =======
+// ======= 整合性チェック =======
 function checkConsistencyUpToCurrentDay(roles){
   for(const [d,results] of seerResultsByDay){
     if(d>currentDay) continue;
@@ -470,7 +436,7 @@ function checkConsistencyUpToCurrentDay(roles){
   return true;
 }
 
-// ======= 昼の吊り（候補ポリシー） =======
+// ======= 昼の吊り =======
 function pickLynch(alive, roles, day, cand, state, has2ClaimedHunter, hunterClaims){
   const byCO = (co)=> alive.filter(p=> selected.get(p)?.co === co);
   const grays= alive.filter(p=>{
@@ -480,16 +446,13 @@ function pickLynch(alive, roles, day, cand, state, has2ClaimedHunter, hunterClai
 
   if(day===2){
     if(cand.a==='霊能ロラ'){
-      const meds = byCO('霊能CO');
-      if(meds.length===0) return randomPick(grays)||randomPick(alive);
+      const meds = byCO('霊能CO'); if(meds.length===0) return randomPick(grays)||randomPick(alive);
       return randomPick(meds);
     }
     if(cand.a==='霊能決め打ち'){
-      const meds = byCO('霊能CO');
-      if(meds.length>=2) return randomPick(meds);
+      const meds = byCO('霊能CO'); if(meds.length>=2) return randomPick(meds);
       return randomPick(grays)||randomPick(alive);
     }
-    // 灰吊り（既定）
     if(cand.g==='貫通' && has2ClaimedHunter){
       hunterClaims = hunterClaims.filter(h=> alive.includes(h));
       if(hunterClaims.length>0) return randomPick(hunterClaims);
@@ -497,15 +460,12 @@ function pickLynch(alive, roles, day, cand, state, has2ClaimedHunter, hunterClai
     return randomPick(grays)||randomPick(alive);
   }
 
-  // 3d以降
   if(cand.a==='占い決め打ち'){
-    const seers = byCO('占いCO');
-    if(seers.length>=2) return randomPick(seers);
+    const seers = byCO('占いCO'); if(seers.length>=2) return randomPick(seers);
     return randomPick(grays)||randomPick(alive);
   }
   if(cand.a==='霊能決め打ち'){
-    const meds = byCO('霊能CO');
-    if(meds.length>=2) return randomPick(meds);
+    const meds = byCO('霊能CO'); if(meds.length>=2) return randomPick(meds);
     return randomPick(grays)||randomPick(alive);
   }
   if(cand.a==='灰決め打ち'){
@@ -515,11 +475,10 @@ function pickLynch(alive, roles, day, cand, state, has2ClaimedHunter, hunterClai
     }
     return randomPick(grays)||randomPick(alive);
   }
-
   return randomPick(grays)||randomPick(alive);
 }
 
-// ======= 夜の噛み（護衛近似） =======
+// ======= 夜の噛み =======
 function pickKill(alive, roles, cand, state){
   const seers = alive.filter(p=> selected.get(p)?.co==='占いCO');
   const meds  = alive.filter(p=> selected.get(p)?.co==='霊能CO');
@@ -529,12 +488,11 @@ function pickKill(alive, roles, cand, state){
   if(targets.length===0) targets = villagers;
 
   if(cand.g==='クロス' && (seers.length>0 && meds.length>0)){
-    if(Math.random()<0.4) return null; // クロス護衛成功の近似
+    if(Math.random()<0.4) return null;
   }
   return randomPick(targets);
 }
 
-// ======= MCユーティリティ =======
 function randomPick(arr){ if(!arr||arr.length===0) return null; return arr[Math.floor(Math.random()*arr.length)]; }
 
 // ======= グラフ＆ランキング =======
@@ -571,20 +529,16 @@ function renderRanking(day){
 function exportModelText(){
   const json = localStorage.getItem(MODEL_KEY) || "{}";
   if (navigator.clipboard && window.isSecureContext) {
-    navigator.clipboard.writeText(json).then(()=>{
-      alert('学習データをクリップボードにコピーしました。');
-    }).catch(()=>{ showFallbackText(json); });
-  } else {
-    showFallbackText(json);
-  }
+    navigator.clipboard.writeText(json).then(()=> alert('学習データをコピーしました。'))
+    .catch(()=> showFallbackText(json));
+  } else { showFallbackText(json); }
 }
 function showFallbackText(text){
-  if(!pasteArea || !pasteModal){ alert('コピーできない場合は長押しで選択→コピーしてください。'); return; }
-  pasteArea.value = text;
-  pasteModal.style.display = 'block';
-  pasteArea.select();
-  try { document.execCommand('copy'); alert('コピーしました。'); }
-  catch { /* モーダルに残すだけ */ }
+  if(!els.pasteArea || !els.pasteModal){ alert('コピーできない場合は長押しで選択→コピーしてください。'); return; }
+  els.pasteArea.value = text;
+  els.pasteModal.style.display = 'block';
+  els.pasteArea.select();
+  try { document.execCommand('copy'); } catch {}
 }
 function exportModelFile(){
   try{
@@ -601,36 +555,24 @@ function exportModelFile(){
   }catch(e){ alert('保存に失敗しました。'); }
 }
 function importModelFromFile(e){
-  const file = e.target.files?.[0];
-  if(!file) return;
+  const file = e.target.files?.[0]; if(!file) return;
   const reader = new FileReader();
   reader.onload = () => {
-    try{
-      const incoming = JSON.parse(String(reader.result||"{}"));
-      mergeOrOverwrite(incoming);
-    }catch(err){
-      alert('読み込みに失敗しました（ファイル形式を確認）');
-    }
+    try{ const incoming = JSON.parse(String(reader.result||"{}")); mergeOrOverwrite(incoming); }
+    catch{ alert('読み込みに失敗しました（ファイル形式を確認）'); }
   };
-  reader.readAsText(file, 'utf-8');
-  e.target.value = '';
+  reader.readAsText(file, 'utf-8'); e.target.value = '';
 }
-function openPasteModal(){ pasteArea.value = ''; pasteModal.style.display = 'block'; pasteArea.focus(); }
-function closePasteModal(){ pasteModal.style.display = 'none'; }
+function openPasteModal(){ els.pasteArea.value=''; els.pasteModal.style.display='block'; els.pasteArea.focus(); }
+function closePasteModal(){ els.pasteModal.style.display='none'; }
 function applyPasteImport(){
-  try{
-    const incoming = JSON.parse(pasteArea.value || "{}");
-    mergeOrOverwrite(incoming);
-  }catch(err){
-    alert('JSONの形式が不正です。');
-  } finally {
-    closePasteModal();
-  }
+  try{ const incoming = JSON.parse(els.pasteArea.value || "{}"); mergeOrOverwrite(incoming); }
+  catch{ alert('JSONの形式が不正です。'); }
+  finally{ closePasteModal(); }
 }
 function mergeOrOverwrite(incoming){
   if(confirm('読み込んだ学習で上書きしますか？（キャンセルでマージ）')){
-    localStorage.setItem(MODEL_KEY, JSON.stringify(incoming));
-    MODEL = incoming || {};
+    localStorage.setItem(MODEL_KEY, JSON.stringify(incoming)); MODEL = incoming || {};
   }else{
     const mine = JSON.parse(localStorage.getItem(MODEL_KEY) || "{}");
     for(const k in incoming){
@@ -638,17 +580,14 @@ function mergeOrOverwrite(incoming){
       const t = incoming[k] || {};
       mine[k] = { a:(m.a||1)+(t.a||0), b:(m.b||1)+(t.b||0), seen:(m.seen||0)+(t.seen||0) };
     }
-    localStorage.setItem(MODEL_KEY, JSON.stringify(mine));
-    MODEL = mine;
+    localStorage.setItem(MODEL_KEY, JSON.stringify(mine)); MODEL = mine;
   }
   alert('学習データを取り込みました。ページを更新します。');
   location.reload();
 }
 function resetModel(){
   if(confirm('学習データをリセットしますか？（元に戻せません）')){
-    localStorage.removeItem(MODEL_KEY);
-    MODEL = {};
-    location.reload();
+    localStorage.removeItem(MODEL_KEY); MODEL = {}; location.reload();
   }
 }
 
