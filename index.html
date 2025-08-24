@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <title>人狼解析ツール</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <link rel="stylesheet" href="./jj-theme.css">
+</head>
+<body>
+  <header class="header">
+    <h1>人狼解析ツール</h1>
+    <!-- スマホOK：学習の保存/読み込み（テキスト＆ファイル） -->
+    <div class="model-share">
+      <button id="exportModelText" class="jj-btn">学習をコピー（テキスト）</button>
+      <button id="importModelText" class="jj-btn jj-btn--ghost">貼り付けから読み込み</button>
+
+      <label for="importFile" class="jj-btn jj-btn--ghost file-label">学習を読み込む（ファイル）</label>
+      <input id="importFile" type="file" accept="application/json" hidden>
+
+      <button id="exportModelFile" class="jj-btn jj-btn--ghost">学習を保存（ファイル）</button>
+      <button id="resetModel" class="jj-btn jj-btn--ghost">学習をリセット</button>
+    </div>
+  </header>
+
+  <!-- 貼り付け用モーダル -->
+  <div id="pasteModal" class="modal">
+    <div class="modal__panel">
+      <p class="modal__title">ここに学習JSONを貼り付けてください：</p>
+      <textarea id="pasteArea" rows="8" class="modal__textarea"></textarea>
+      <div class="modal__actions">
+        <button id="pasteCancel" class="jj-btn jj-btn--ghost">キャンセル</button>
+        <button id="pasteApply" class="jj-btn">読み込む</button>
+      </div>
+    </div>
+  </div>
+
+  <main class="grid">
+    <!-- 左：候補キャラ -->
+    <section class="panel">
+      <h2>キャラ候補</h2>
+      <div class="row">
+        <input id="newName" class="input" placeholder="キャラ名を追加">
+        <button id="addName" class="jj-btn">追加</button>
+        <button id="reloadCandidates" class="jj-btn jj-btn--ghost">更新</button>
+      </div>
+      <select id="namePool" size="12" class="list"></select>
+      <div class="row">
+        <button id="addSelected" class="jj-btn">→ 右に追加</button>
+        <button id="clearAll" class="jj-btn jj-btn--ghost">クリア</button>
+      </div>
+    </section>
+
+    <!-- 右：選択ロスター -->
+    <section class="panel">
+      <h2>キャラ選択 / CO / 真役職</h2>
+      <div id="selectedRoster" class="roster"></div>
+    </section>
+
+    <!-- 下段左：日別入力 -->
+    <section class="panel panel--wide">
+      <h2>日別（吊り / 噛み / 占い / 霊能）</h2>
+      <div id="dayTabs" class="tabs"></div>
+
+      <div class="row">
+        <select id="lynchSel" class="input"></select>
+        <select id="killSel" class="input"></select>
+        <button id="applyDay" class="jj-btn">この日を確定</button>
+        <button id="undoDay" class="jj-btn jj-btn--ghost">取り消し</button>
+      </div>
+
+      <div class="grid-2">
+        <div>
+          <h3>占い結果（複数行）</h3>
+          <div class="kvs" id="seerRows"></div>
+          <button id="addSeerRow" class="jj-btn jj-btn--ghost">＋ 追加</button>
+        </div>
+        <div>
+          <h3>霊能結果（複数行）</h3>
+          <div class="kvs" id="medRows"></div>
+          <button id="addMedRow" class="jj-btn jj-btn--ghost">＋ 追加</button>
+        </div>
+      </div>
+
+      <div id="err" class="err" style="display:none"></div>
+
+      <h3>履歴</h3>
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th>日</th><th>吊り</th><th>噛み</th><th>霊能</th><th>生存</th><th>灰数</th></tr></thead>
+          <tbody id="historyBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 下段右：グラフ＆勝率順 -->
+    <section class="panel">
+      <h2>当日の勝率推移 / 勝率順</h2>
+      <div id="chart" class="chart">※ まだ確定された日がありません。</div>
+      <div id="rankingWrap" class="ranking placeholder">※ 当日の記録がありません。</div>
+    </section>
+  </main>
+
+  <script src="./app.js"></script>
+</body>
+</html>
